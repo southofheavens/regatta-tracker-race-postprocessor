@@ -6,12 +6,12 @@
 #include <Poco/Net/HTTPServer.h>
 #include <Poco/Net/HTTPResponse.h>
 
-#include <rgt/devkit/RGTException.h>
-#include <rgt/devkit/General.h>
-#include <rgt/devkit/subsystems/S3Subsystem.h>
-#include <rgt/devkit/subsystems/PsqlSubsystem.h>
-#include <rgt/devkit/subsystems/RedisSubsystem.h>
-#include <rgt/devkit/subsystems/RabbitMQSubsystem.h>
+#include <RGT/Devkit/RGTException.h>
+#include <RGT/Devkit/General.h>
+#include <RGT/Devkit/Subsystems/S3Subsystem.h>
+#include <RGT/Devkit/Subsystems/PsqlSubsystem.h>
+#include <RGT/Devkit/Subsystems/RedisSubsystem.h>
+#include <RGT/Devkit/Subsystems/RabbitMQSubsystem.h>
 
 #include <aws/core/Aws.h>
 
@@ -49,7 +49,7 @@ int RacePostprocessorServer::main(const std::vector<std::string>&)
         .rabbitmqSubsystem = Poco::Util::Application::getSubsystem<Devkit::Subsystems::RabbitMQSubsystem>()
     };
 
-    consume<SubsystemsForConsume>(subsystems.rabbitmqSubsystem.getAmqpConnection("postprocessor"), 
+    consume<SubsystemsForConsume>(subsystems.rabbitmqSubsystem.getChannel(), 
         "postprocessor_tasks", subsystems, postprocessorMessageHandler);
 
     waitForTerminationRequest(); // никогда не выполнится

@@ -1,5 +1,4 @@
-#ifndef __RACE_POSTPROCESSOR_SERVER_H__
-#define __RACE_POSTPROCESSOR_SERVER_H__
+#pragma once
 
 #include <Poco/Util/ServerApplication.h>
 
@@ -17,5 +16,3 @@ public:
 };
 
 } // namespace RGT::Postprocessor
-
-#endif // __RACE_POSTPROCESSOR_SERVER_H__

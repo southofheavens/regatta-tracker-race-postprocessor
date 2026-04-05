@@ -1,6 +1,6 @@
 #include <Utils.h>
 
-#include <rgt/devkit/RGTException.h>
+#include <RGT/Devkit/RGTException.h>
 
 #include <iostream>
 #include <iomanip>
@@ -58,6 +58,7 @@ getParticipantsCoordinates
     if (clientPtr == nullptr or not clientPtr->isConnected()) 
     {
         // TODO лог
+        // перезагрузить redis?
         throw std::exception{};
     }
 
@@ -68,6 +69,38 @@ getParticipantsCoordinates
         result.push_back({id,coordinates});
     }
     return result;
+}
+
+/// @brief Удаляет из redis ключи вида user_participation:{id},
+/// где id берутся из вектора participantsIds
+/// @throw std::runtime_error при ошибке удаления
+void
+deleteParticipantsCoordinates
+(
+    const std::vector<uint64_t> & participantsIds,
+    RedisClientObjectPool & redisPool
+)
+{
+    Poco::Redis::PooledConnection pc(redisPool, 500);
+    Poco::Redis::Client::Ptr clientPtr = static_cast<Poco::Redis::Client::Ptr>(pc);
+    if (clientPtr == nullptr or not clientPtr->isConnected())
+    {
+        // TODO лог
+        // перезагрузить redis?
+        throw std::exception{};
+    }
+
+    Poco::Redis::Array cmd;
+    cmd << "DEL";
+    for (const uint64_t & id : participantsIds) {
+        cmd << std::format("user_participation:{}", id);
+    }
+
+    Poco::Int64 result = clientPtr->execute<Poco::Int64>(cmd);
+
+    if (result != participantsIds.size()) {
+        throw std::runtime_error("error while deleting users participations from redis");
+    }
 }
 
 struct Trackpoint
@@ -259,12 +292,13 @@ bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsu
         Aws::S3::Model::PutObjectOutcome outcome = s3Client.PutObject(putRequest);
     }
 
-    // Отправляем микросервису аналитики уведомление о том, что можно приступать к анализу
+    AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(std::to_string(raceId));
+    msg->DeliveryMode(AmqpClient::BasicMessage::dm_persistent);
+    subsystems.rabbitmqSubsystem.getChannel().BasicPublish("", "analytics_tasks", msg);
 
-    // УДАЛЯЕМ ИЗ REDIS ключи
+    deleteParticipantsCoordinates(participantsIds, subsystems.redisSubsystem.getPool());
+
     return true;
 }
 
-
-
-} // RGT::Postprocessor
+} // namespace RGT::Postprocessor

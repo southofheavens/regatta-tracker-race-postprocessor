@@ -1,6 +1,7 @@
 .vscode/
 
-subprojects/*
+subprojects/**
+!subprojects/*.wrap
 
 .DS_Store
 

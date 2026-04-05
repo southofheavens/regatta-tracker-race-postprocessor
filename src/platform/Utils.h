@@ -1,10 +1,9 @@
-#ifndef __UTILS_H__
-#define __UTILS_H__
+#pragma once
 
-#include <rgt/devkit/subsystems/RabbitMQSubsystem.h>
-#include <rgt/devkit/subsystems/PsqlSubsystem.h>
-#include <rgt/devkit/subsystems/RedisSubsystem.h>
-#include <rgt/devkit/subsystems/S3Subsystem.h>
+#include <RGT/Devkit/Subsystems/RabbitMQSubsystem.h>
+#include <RGT/Devkit/Subsystems/PsqlSubsystem.h>
+#include <RGT/Devkit/Subsystems/RedisSubsystem.h>
+#include <RGT/Devkit/Subsystems/S3Subsystem.h>
 #include <Poco/Runnable.h>
 
 namespace RGT::Postprocessor
@@ -26,42 +25,39 @@ bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsu
 template<typename Context>
 inline void consume
 (
-    const RGT::Devkit::Subsystems::RabbitMQSubsystem::AmqpConnection & connection, 
+    AmqpClient::Channel & channel, 
     const std::string & queueName, 
     Context & messageHandlerContext, 
     std::function<bool(const std::string &, Context &)> messageHandler
 )
 {
-    amqp_basic_consume(connection.connection, connection.channel, amqp_cstring_bytes(queueName.c_str()), 
-        amqp_empty_bytes, 0, 0, 0, amqp_empty_table);
-    amqp_rpc_reply_t consumeResult = amqp_get_rpc_reply(connection.connection);
-    if (consumeResult.reply_type != AMQP_RESPONSE_NORMAL) {
-        throw std::runtime_error("consume failed");
-    }
-
+    std::string consumerTag = channel.BasicConsume(queueName, "", false, false, false, 1);
+    
     while (true)
     {
-        amqp_envelope_t env;
-        amqp_maybe_release_buffers(connection.connection);
-        amqp_rpc_reply_t consumeMsgResult = amqp_consume_message(connection.connection, &env, nullptr, 0);
-        if (consumeMsgResult.reply_type != AMQP_RESPONSE_NORMAL) {
-            throw std::runtime_error("consume message failed");
+        AmqpClient::Envelope::ptr_t envelope;
+        
+        if (not channel.BasicConsumeMessage(consumerTag, envelope)) {
+            throw std::runtime_error("BasicConsumeMessage failed");
         }
 
-        std::string receivedMessage((char*)env.message.body.bytes, env.message.body.len);
-        uint64_t tag = env.delivery_tag;
+        std::string receivedMessage = envelope->Message()->Body();
+        
         std::cout << "ПОЛУЧЕНО СООБЩЕНИЕ: " << receivedMessage << std::endl;
-        if (messageHandler(receivedMessage, messageHandlerContext)) {
-            amqp_basic_ack(connection.connection, connection.channel, tag, 0);
+        
+        try 
+        {
+            if (messageHandler(receivedMessage, messageHandlerContext)) {
+                channel.BasicAck(envelope); 
+            } 
+            else {
+                channel.BasicReject(envelope, false); 
+            }
+        } 
+        catch (const std::exception & e) {
+            channel.BasicReject(envelope, false);
         }
-        else {
-            amqp_basic_nack(connection.connection, connection.channel, tag, 0, 0);
-        }
-
-        amqp_destroy_envelope(&env);
     }
 }
     
 } // namespace RGT::Postprocessor
-
-#endif // __UTILS_H__
