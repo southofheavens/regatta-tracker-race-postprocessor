@@ -41,6 +41,8 @@ RUN git clone --depth 1 https://github.com/alanxz/SimpleAmqpClient.git /tmp/Simp
 
 COPY . ./app
 
+COPY ./startup.config /etc/rgt-race-postprocessor.config
+
 WORKDIR /app
 
 RUN meson build

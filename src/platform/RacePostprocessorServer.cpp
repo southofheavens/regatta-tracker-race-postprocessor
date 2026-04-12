@@ -12,6 +12,7 @@
 #include <RGT/Devkit/Subsystems/PsqlSubsystem.h>
 #include <RGT/Devkit/Subsystems/RedisSubsystem.h>
 #include <RGT/Devkit/Subsystems/RabbitMQSubsystem.h>
+#include <RGT/Devkit/ProjectName.h>
 
 #include <aws/core/Aws.h>
 
@@ -22,7 +23,14 @@ namespace RGT::Postprocessor
 
 void RacePostprocessorServer::initialize(Poco::Util::Application & self)
 {
-    loadConfiguration();
+    try
+    {
+        Poco::Util::JSONConfiguration::Ptr cfg = new Poco::Util::JSONConfiguration(RGT::Devkit::getConfigPath());
+        self.config().add(cfg, PRIO_APPLICATION);
+    }
+    catch (const Poco::Exception & e) {
+        throw std::runtime_error(std::format("Error loading JSON config: {}", e.displayText()));
+    }
 
     RGT::Devkit::readDotEnv();
 
