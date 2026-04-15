@@ -135,8 +135,11 @@ Trackpoint parseTrackpoint(const std::string & entry)
 
 std::vector<Trackpoint> parseParticipantTrackpoints(const Poco::Redis::Array & entries)
 {
-    std::vector<Trackpoint> trackpoints;
+    if (entries.isNull()) {
+        return {};
+    }
 
+    std::vector<Trackpoint> trackpoints;
     for (const Poco::Redis::RedisType::Ptr & typePtr : entries)
     {   
         // Здесь опускаем проверки на typePtr->isBulkString() и на typeBulkString.value().isNull()  
@@ -234,7 +237,6 @@ namespace RGT::Postprocessor
 bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsume & subsystems)
 {
     uint64_t raceId;
-    std::cout << message << '\n';
     try {
         raceId = std::stoull(message);
     }
@@ -254,7 +256,7 @@ bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsu
 
     session <<
         "UPDATE races "
-        "SET status = 'Finished' "
+        "SET status = 'finished' "
         "WHERE id = $1;",
         Poco::Data::Keywords::use(raceId),
         Poco::Data::Keywords::now;
@@ -263,7 +265,7 @@ bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsu
     session << 
         "SELECT user_id "
         "FROM participations "
-        "WHERE race_id = $1 AND role = 'Participant';",
+        "WHERE race_id = $1 AND role = 'participant';",
         Poco::Data::Keywords::use(raceId),
         Poco::Data::Keywords::into(participantsIds),
         Poco::Data::Keywords::now;
@@ -302,3 +304,5 @@ bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsu
 }
 
 } // namespace RGT::Postprocessor
+
+// Если пользователь не загрузил координаты то при попытке составить для него gpx-файл всё падает 
