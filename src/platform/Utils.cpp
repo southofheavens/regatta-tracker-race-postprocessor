@@ -294,7 +294,8 @@ bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsu
         Aws::S3::Model::PutObjectOutcome outcome = s3Client.PutObject(putRequest);
     }
 
-    AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(std::to_string(raceId));
+    std::string stringMessage = std::format("{{ \"n\" : {} }}", raceId);
+    AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(stringMessage);
     msg->DeliveryMode(AmqpClient::BasicMessage::dm_persistent);
     subsystems.rabbitmqSubsystem.getChannel().BasicPublish("", "analytics_tasks", msg);
 
