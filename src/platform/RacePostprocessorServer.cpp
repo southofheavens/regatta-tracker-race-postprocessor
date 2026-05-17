@@ -14,8 +14,6 @@
 #include <RGT/Devkit/Subsystems/RabbitMQSubsystem.h>
 #include <RGT/Devkit/ProjectName.h>
 
-#include <aws/core/Aws.h>
-
 #include <Poco/Util/JSONConfiguration.h>
 
 namespace RGT::Postprocessor

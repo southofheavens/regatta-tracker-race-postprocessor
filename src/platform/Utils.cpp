@@ -10,8 +10,7 @@
 #include <Poco/XML/XMLWriter.h>
 #include <Poco/SAX/AttributesImpl.h>
 
-#include <aws/s3/S3Client.h>
-#include <aws/s3/model/PutObjectRequest.h>
+#include <RGT/Devkit/S3/Client.h>
 
 namespace
 {
@@ -245,6 +244,11 @@ bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsu
         throw;
     }
 
+    if (raceId == 0) {
+        std::cerr << "postprocessor: ignore message with race id 0\n";
+        return false;
+    }
+
     Poco::Data::Session session = subsystems.psqlSubsystem.getPool().get();
 
     session <<
@@ -278,26 +282,26 @@ bool postprocessorMessageHandler(const std::string & message, SubsystemsForConsu
     std::vector<std::pair<uint64_t, std::vector<Trackpoint>>> usersTrackpoints = 
         parseParticipantsTrackpoints(usersCoordinates);
 
-    Aws::S3::S3Client & s3Client = subsystems.s3Subsystem.getS3Client();
-    // Генерируем GPX'ы и заливаем их в minio
+    Devkit::S3::Client & s3Client = subsystems.s3Subsystem.getS3Client();
     for (const auto & [userId, trackpoints] : usersTrackpoints)
     {
-        Aws::S3::Model::PutObjectRequest putRequest;
-        putRequest.SetKey(std::format("race_{}/user_{}.gpx", raceId, userId));
-        putRequest.SetBucket("gpx-files");
-
-        std::shared_ptr<Aws::StringStream> inputData = Aws::MakeShared<Aws::StringStream>("UploadHandlerInputStream");
-        *inputData << generateGpxFromCoordinates(trackpoints);
-        putRequest.SetBody(inputData);
-        putRequest.SetContentType("application/gpx+xml");
-
-        Aws::S3::Model::PutObjectOutcome outcome = s3Client.PutObject(putRequest);
+        s3Client.putObject(
+            "gpx-files",
+            std::format("race_{}/user_{}.gpx", raceId, userId),
+            generateGpxFromCoordinates(trackpoints),
+            "application/gpx+xml");
     }
 
-    std::string stringMessage = std::format("{{ \"n\" : {} }}", raceId);
-    AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(stringMessage);
-    msg->DeliveryMode(AmqpClient::BasicMessage::dm_persistent);
-    subsystems.rabbitmqSubsystem.getChannel().BasicPublish("", "analytics_tasks", msg);
+    if (not usersTrackpoints.empty())
+    {
+        std::string stringMessage = std::format("{{ \"n\" : {} }}", raceId);
+        AmqpClient::BasicMessage::ptr_t msg = AmqpClient::BasicMessage::Create(stringMessage);
+        msg->DeliveryMode(AmqpClient::BasicMessage::dm_persistent);
+        subsystems.rabbitmqSubsystem.getChannel().BasicPublish("", "analytics_tasks", msg);
+    }
+    else {
+        std::cerr << std::format("postprocessor: race {} has no trackpoints, skip analytics_tasks\n", raceId);
+    }
 
     deleteParticipantsCoordinates(participantsIds, subsystems.redisSubsystem.getPool());
 

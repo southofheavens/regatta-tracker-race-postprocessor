@@ -22,9 +22,6 @@ sodium = cpp.find_library('sodium', required: true)
 ssl = cpp.find_library('ssl', required: true)
 crypto = cpp.find_library('crypto', required: true)
 
-aws_core = cpp.find_library('aws-cpp-sdk-core', required: true)
-aws_s3 = cpp.find_library('aws-cpp-sdk-s3', required: true)
-
 all_deps = [
   poco_foundation,
   poco_util,
@@ -38,8 +35,6 @@ all_deps = [
   ssl,
   crypto,
   devkit_dep,
-  aws_core,
-  aws_s3,
 ]
 
 if poco_data.found()
